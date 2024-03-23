@@ -3,9 +3,11 @@ const sqlite3 = require('sqlite3');
 const express = require("express");
 const {open} = require('sqlite');
 const jwt = require('jsonwebtoken');
+var cors = require('cors')
 const bcrypt = require("bcrypt");
 const app = express();
 
+app.use(cors())
 const dbPath = path.join(__dirname, "login.db");
 let db = null;
 app.use(express.json());
@@ -14,7 +16,7 @@ app.use(express.json());
 //const db = new sqlite3.Database("./database_name.db", sqlite3.OPEN_READWRITE, (err) => {if (err) return console.error(err.message);});
 //db.run(`CREATE TABLE user (username TEXT, password TEXT)`);
 
-
+//
 // Database Connection
 const Connection = async () => {
     try {
@@ -56,7 +58,7 @@ const authenticationToken = (request, response, next) => {
       });
     }
   };
-  
+
 // API
 app.post("/register", async (request, response) => {
     const { username, password } = request.body;
