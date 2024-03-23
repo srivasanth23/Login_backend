@@ -2,6 +2,8 @@ const path = require('path');
 const sqlite3 = require('sqlite3');
 const express = require("express");
 const {open} = require('sqlite');
+const jwt = require('jsonwebtoken');
+const bcrypt = require("bcrypt");
 const app = express();
 
 const dbPath = path.join(__dirname, "login.db");
@@ -30,15 +32,41 @@ const Connection = async () => {
 
 Connection();
 
+
+const authenticationToken = (request, response, next) => {
+    let jwtToken;
+    const authHeader = request.headers["authorization"];
+    if (authHeader !== undefined) {
+      jwtToken = authHeader.split(" ")[1];
+    }
+  
+    if (jwtToken === undefined) {
+      response.status(401);
+      response.send("Invalid JWT Token");
+    } else {
+      jwt.verify(jwtToken, "MY_SECRET_TOKEN", async (error, payload) => {
+        if (error) {
+          response.status(401);
+          response.send("Invalid JWT Token");
+        } else {
+          request.username = payload.username;
+          console.log(payload, "u");
+          next();
+        }
+      });
+    }
+  };
+  
 // API
-app.post("/login", async (request, response) => {
+app.post("/register", async (request, response) => {
     const { username, password } = request.body;
     const query = `select * from user where username = '${username}' and password = '${password}'`;
     const dbUser = await db.get(query);
 
     if (dbUser === undefined) {
         if(password.length > 5){
-            const query = `insert into user (username, password) values ('${username}', '${password}')`;
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const query = `insert into user (username, password) values ('${username}', '${hashedPassword}')`;
             await db.run(query);
             response.send("User created successfully");
         } else {
@@ -50,6 +78,31 @@ app.post("/login", async (request, response) => {
         response.status(400);
     }
 })
+
+
+app.post("/login/", async (request, response) => {
+    const { username, password } = request.body;
+    const selectUserQuery = `SELECT * FROM user WHERE username = '${username}'`;
+    const dbUser = await db.get(selectUserQuery);
+  
+    if (dbUser === undefined) {
+      response.status(400);
+      response.send("Invalid user");
+    } else {
+      const isPasswordMatched = await bcrypt.compare(password, dbUser.password);
+      if (isPasswordMatched === true) {
+        const payload = {
+          username: username,
+        };
+        const jwtToken = jwt.sign(payload, "MY_SECRET_TOKEN");
+        response.send({ jwtToken });
+      } else {
+        response.status(400);
+        response.send("Invalid password");
+      }
+    }
+});
+
 
 app.get("/", async (req,res) => {
     const query = `select * from user`;
